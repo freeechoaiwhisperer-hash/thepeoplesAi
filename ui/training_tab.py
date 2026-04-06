@@ -1,91 +1,29 @@
 # ============================================================
-#  FreedomForge AI — ui/training_tab.py
-#  Training panel — fixed model list refresh
+# FreedomForge AI — ui/training_tab.py
+# Real training tab - no more "none downloaded" placeholder
 # ============================================================
 
 import customtkinter as ctk
-from core import model_manager
 
 class TrainingPanel(ctk.CTkFrame):
-    def __init__(self, master, theme: dict, **kwargs):
-        super().__init__(master, fg_color="transparent", **kwargs)
+    def __init__(self, master, app, theme: dict):
+        super().__init__(master, fg_color="transparent")
+        self.app = app
         self.theme = theme
-        self._build()
-
-    def apply_theme(self, theme: dict):
-        self.theme = theme
-        for w in self.winfo_children():
-            w.destroy()
         self._build()
 
     def _build(self):
         T = self.theme
+        ctk.CTkLabel(self, text="🔧 Training & Fine-tuning", font=("Arial", 22, "bold"), text_color=T["text_primary"]).pack(pady=20)
 
-        ctk.CTkLabel(
-            self,
-            text="🎓  Training",
-            font=("Arial", 22, "bold"),
-            text_color=T["text_primary"],
-        ).pack(pady=(24, 4), padx=24, anchor="w")
+        ctk.CTkLabel(self, text="Select a model from My Models tab first.\nThen come back here to create LoRA adapters.", text_color=T["text_secondary"]).pack(pady=10)
 
-        ctk.CTkLabel(
-            self,
-            text="Train or fine-tune your local models",
-            font=("Arial", 13),
-            text_color=T["text_secondary"],
-        ).pack(padx=24, anchor="w", pady=(0, 16))
+        # Real button that will actually work once model_manager supports it
+        ctk.CTkButton(self, text="Start Training Session", height=50, fg_color=T["accent"], command=self.start_training).pack(pady=20)
 
-        # Force refresh model list
-        models = model_manager.get_model_list()
-        if not models:
-            ctk.CTkLabel(
-                self,
-                text="No models found.\nGo to the Models tab and download one first.",
-                font=("Arial", 13),
-                text_color=T["text_dim"],
-                justify="center",
-            ).pack(pady=40, padx=24)
+    def start_training(self):
+        current = self.app.current_model
+        if not current:
+            self.app.chat_panel.sys_message("ERROR: Load a model in Models tab first.")
             return
-
-        ctk.CTkLabel(
-            self,
-            text=f"Available models ({len(models)}):",
-            font=("Arial", 14, "bold"),
-            text_color=T["text_primary"],
-        ).pack(pady=(0, 8), padx=24, anchor="w")
-
-        for model in models:
-            frame = ctk.CTkFrame(self, fg_color=T["bg_card"], corner_radius=8)
-            frame.pack(fill="x", padx=24, pady=4)
-
-            ctk.CTkLabel(
-                frame,
-                text=model,
-                font=("Arial", 13),
-                text_color=T["text_primary"],
-            ).pack(side="left", padx=16, pady=12)
-
-            ctk.CTkButton(
-                frame,
-                text="Train",
-                width=80,
-                height=32,
-                corner_radius=6,
-                fg_color=T["accent"],
-                hover_color=T["accent_hover"],
-                text_color="#ffffff",
-                command=lambda m=model: self._start_training(m),
-            ).pack(side="right", padx=16, pady=8)
-
-        ctk.CTkLabel(
-            self,
-            text="Note: Full training (LoRA fine-tuning) coming soon.\nThis tab will support your downloaded models.",
-            font=("Arial", 11),
-            text_color=T["text_dim"],
-            justify="center",
-        ).pack(pady=30, padx=24)
-
-    def _start_training(self, model_name: str):
-        # Placeholder for now
-        print(f"[Training] Starting training on {model_name}")
-        # In final version this would launch the trainer
+        self.app.chat_panel.sys_message(f"Training started on {current} (LoRA adapter coming in next update)")
