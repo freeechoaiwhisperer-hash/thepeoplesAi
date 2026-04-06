@@ -1,6 +1,6 @@
 # ============================================================
 # FreedomForge AI — ui/models_tab.py
-# PROFESSIONAL-GRADE Model Library - Fixed My Models + dropdown
+# PROFESSIONAL-GRADE Model Library — fixed My Models + dropdown
 # ============================================================
 
 import os
@@ -16,7 +16,6 @@ from utils.paths import MODELS_DIR as _MODELS_DIR_PATH
 MODELS_DIR = str(_MODELS_DIR_PATH)
 
 class ModelsPanel(ctk.CTkFrame):
-
     def __init__(self, master, app, theme: dict, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.app = app
@@ -35,7 +34,6 @@ class ModelsPanel(ctk.CTkFrame):
     def _build(self):
         T = self.theme
 
-        # Header
         hdr = ctk.CTkFrame(self, fg_color="transparent", height=56)
         hdr.pack(fill="x", padx=22, pady=(20,0))
         hdr.pack_propagate(False)
@@ -45,7 +43,7 @@ class ModelsPanel(ctk.CTkFrame):
 
         ctk.CTkButton(hdr, text="↻ Refresh", width=90, height=30, fg_color=T["bg_hover"], command=self.refresh).pack(side="right", padx=4)
 
-        # My Models card
+        # My Models
         my_card = ctk.CTkFrame(self, corner_radius=10, fg_color=T["bg_card"])
         my_card.pack(fill="x", padx=12, pady=(10,0))
 
@@ -59,11 +57,10 @@ class ModelsPanel(ctk.CTkFrame):
         self.my_models_frame.pack(fill="x", padx=14, pady=(0,10))
         self._refresh_my_models()
 
-        # Catalog area (keep your existing curated models code here)
+        # Catalog placeholder (add your curated list here later)
         self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.scroll.pack(fill="both", expand=True, padx=12, pady=(10,0))
 
-        # TODO: paste your existing SMALL/MEDIUM/LARGE/search/download code here if you have it
         ctk.CTkLabel(self.scroll, text="Curated models coming in next update", text_color=T["text_dim"]).pack(pady=40)
 
         threading.Thread(target=self._probe_local, daemon=True).start()
