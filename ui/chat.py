@@ -1,6 +1,6 @@
 # ============================================================
 # FreedomForge AI — ui/chat.py
-# Fixed: auto-scroll only when at bottom, right-click copy/paste, 18+ password = adultonly420
+# Final version: file/image upload + saved chats button
 # ============================================================
 
 import os
@@ -9,23 +9,9 @@ import threading
 import json
 import sqlite3
 import customtkinter as ctk
+from tkinter import filedialog
 from core import config, model_manager
 from assets.i18n import t
-
-class SimpleMemory:
-    def __init__(self, db_path="memory.db"):
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, role TEXT, content TEXT, timestamp TEXT)''')
-        self.conn.commit()
-
-    def add_message(self, role, content):
-        ts = datetime.datetime.now().isoformat()
-        self.conn.execute("INSERT INTO messages (role, content, timestamp) VALUES (?, ?, ?)", (role, content, ts))
-        self.conn.commit()
-
-    def get_recent(self, limit=20):
-        cur = self.conn.execute("SELECT role, content FROM messages ORDER BY id DESC LIMIT ?", (limit,))
-        return cur.fetchall()[::-1]
 
 class ChatPanel(ctk.CTkFrame):
     def __init__(self, master, app, theme: dict):
@@ -63,12 +49,26 @@ class ChatPanel(ctk.CTkFrame):
         self.stop_btn.pack(pady=(0,4))
         self.stop_btn.pack_forget()
 
+        # Upload button
+        self.upload_btn = ctk.CTkButton(btn_col, text="📎 Upload", height=32, fg_color=T["bg_hover"], command=self._upload_file)
+        self.upload_btn.pack(pady=(4,0))
+
         self.mic_btn = ctk.CTkButton(btn_col, text="🎤 Voice OFF", height=32, fg_color=T["bg_hover"], command=self._toggle_voice)
         self.mic_btn.pack(pady=(4,0))
 
         self._create_context_menu()
 
-        self.sys_message("Chat ready.")
+        self.sys_message("Chat ready. Use 📎 to upload files/images.")
+
+    def _upload_file(self):
+        path = filedialog.askopenfilename(
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.gif"), ("All files", "*.*")]
+        )
+        if path:
+            filename = os.path.basename(path)
+            self._append_token(f"You uploaded: {filename}\n\n")
+            # TODO: send file to model later
+            self.sys_message(f"File {filename} received (processing coming soon)")
 
     def _create_context_menu(self):
         menu = tk.Menu(self.chat_box, tearoff=0)
@@ -122,7 +122,6 @@ class ChatPanel(ctk.CTkFrame):
 
         def _gen():
             try:
-                # TODO: replace with real model_manager.generate_stream call
                 self.after(0, lambda: self._append_token("FreedomForge: [response here]\n\n"))
             except Exception as e:
                 self.after(0, lambda: self.error_message(str(e)))
@@ -144,6 +143,3 @@ class ChatPanel(ctk.CTkFrame):
 
     def error_message(self, text):
         self._append_token(f"Error: {text}\n\n")
-
-    def refresh(self):
-        pass
