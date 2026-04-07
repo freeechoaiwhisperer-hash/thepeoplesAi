@@ -33,6 +33,56 @@ OS="$(uname -s)"
 
 cd "$APP_DIR"
 
+# ── Detect Debian/Ubuntu/Mint ────────────────────────────────
+IS_DEBIAN=false
+if [[ "$OS" == "Linux" ]] && [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    case "${ID:-}:${ID_LIKE:-}" in
+        *debian*|*ubuntu*) IS_DEBIAN=true ;;
+    esac
+fi
+
+# ── System packages (Debian/Ubuntu/Mint) ─────────────────────
+if [[ "$IS_DEBIAN" == "true" ]]; then
+    step "System packages (Debian/Ubuntu/Mint)"
+
+    # Required packages for the app to run and build
+    REQUIRED_APT=(
+        python3
+        python3-venv
+        python3-pip
+        python3-tk
+        portaudio19-dev
+        build-essential
+        pkg-config
+        libssl-dev
+        libffi-dev
+    )
+
+    MISSING_APT=()
+    for pkg in "${REQUIRED_APT[@]}"; do
+        if ! dpkg -s "$pkg" &>/dev/null 2>&1; then
+            MISSING_APT+=("$pkg")
+        fi
+    done
+
+    if [[ ${#MISSING_APT[@]} -gt 0 ]]; then
+        info "Missing packages: ${MISSING_APT[*]}"
+        info "sudo is required to install system packages — you may be prompted for your password."
+        if ! sudo apt-get update; then
+            err "apt-get update failed. Check your internet connection and try again."
+            exit 1
+        fi
+        if ! sudo apt-get install -y "${MISSING_APT[@]}"; then
+            err "Failed to install: ${MISSING_APT[*]}"
+            err "Run manually: sudo apt-get install -y ${MISSING_APT[*]}"
+            exit 1
+        fi
+    fi
+
+    ok "System packages ready"
+fi
+
 # ── Python check ─────────────────────────────────────────────
 step "Checking Python"
 
@@ -40,8 +90,10 @@ if ! command -v python3 &>/dev/null; then
     err "Python 3 not found."
     if [[ "$OS" == "Darwin" ]]; then
         echo "  Install with: brew install python3"
+    elif [[ "$IS_DEBIAN" == "true" ]]; then
+        echo "  Install with: sudo apt-get install -y python3 python3-venv python3-pip"
     else
-        echo "  Install with: sudo apt install python3 python3-pip python3-venv"
+        echo "  Install with your distro's package manager (e.g. dnf install python3)"
     fi
     exit 1
 fi
@@ -56,21 +108,15 @@ if [[ "$PY_MAJOR" -lt 3 || ( "$PY_MAJOR" -eq 3 && "$PY_MINOR" -lt 10 ) ]]; then
 fi
 ok "Python $PY_VER"
 
-# ── System packages (Linux) ──────────────────────────────────
-if [[ "$OS" == "Linux" ]]; then
+# ── System packages (non-Debian Linux — best-effort) ─────────
+if [[ "$OS" == "Linux" ]] && [[ "$IS_DEBIAN" == "false" ]]; then
     step "System packages"
 
     if ! python3 -c "import tkinter" &>/dev/null 2>&1; then
-        info "Installing tkinter..."
-        sudo apt-get install -y python3-tk &>/dev/null || warn "tkinter: sudo apt install python3-tk"
+        warn "tkinter not found — install it for your distro (e.g. dnf install python3-tkinter)"
     fi
 
-    if ! dpkg -l portaudio19-dev &>/dev/null 2>&1; then
-        info "Installing audio support (portaudio)..."
-        sudo apt-get install -y portaudio19-dev &>/dev/null || warn "portaudio missing — voice input may not work"
-    fi
-
-    ok "System packages"
+    ok "System package check done (non-Debian distro — install tkinter/portaudio manually if needed)"
 fi
 
 # ── Virtual environment ──────────────────────────────────────
@@ -90,26 +136,40 @@ ok ".venv ready ($VENV)"
 # ── Core Python packages ─────────────────────────────────────
 step "Installing Python packages"
 
-info "Installing dependencies..."
-pip install \
-    "customtkinter>=5.2.0" \
-    "psutil>=5.9.0" \
-    "setuptools>=68.0.0" \
-    "requests>=2.28.0" \
-    "SpeechRecognition>=3.10.0" \
-    "pyttsx3>=2.90" \
-    "cryptography>=41.0.0" \
-    "Pillow>=10.0.0" \
-    --quiet
+info "Installing core dependencies..."
+CORE_PACKAGES=(
+    "customtkinter>=5.2.0"
+    "psutil>=5.9.0"
+    "setuptools>=68.0.0"
+    "requests>=2.28.0"
+    "SpeechRecognition>=3.10.0"
+    "pyttsx3>=2.90"
+    "cryptography>=41.0.0"
+    "Pillow>=10.0.0"
+)
+if ! pip install "${CORE_PACKAGES[@]}"; then
+    err "Failed to install core Python packages — see errors above."
+    err "Fix the issues and re-run install.sh"
+    exit 1
+fi
 ok "Core packages installed"
 
-# GPUtil — needs setuptools (distutils shim) on Python 3.12+
-info "Installing GPU utilities..."
-pip install "gputil>=1.4.0" --quiet 2>/dev/null || warn "GPUtil optional — GPU% monitor disabled"
+# GPUtil — optional; needs setuptools (distutils shim) on Python 3.12+
+info "Installing GPU utilities (optional)..."
+pip install "gputil>=1.4.0" 2>/dev/null \
+    || warn "GPUtil not installed — GPU% monitor will be disabled. (optional)"
 
-# pyaudio — needs portaudio system lib
-info "Installing audio packages..."
-pip install "pyaudio>=0.2.13" --quiet 2>/dev/null || warn "pyaudio optional — voice input may need: sudo apt install portaudio19-dev"
+# pyaudio — optional; needs portaudio system lib
+info "Installing audio support (optional)..."
+if ! pip install "pyaudio>=0.2.13" 2>/dev/null; then
+    if [[ "$IS_DEBIAN" == "true" ]]; then
+        warn "pyaudio not installed — voice input disabled."
+        warn "  To enable: sudo apt-get install -y portaudio19-dev && pip install pyaudio"
+    else
+        warn "pyaudio not installed — voice input disabled."
+        warn "  To enable: install portaudio for your distro, then run: pip install pyaudio"
+    fi
+fi
 
 ok "All packages done"
 
@@ -155,15 +215,58 @@ python3 -c "import llama_cpp; print()" 2>/dev/null \
     && ok "AI engine ready" \
     || warn "AI engine not installed — app runs but cannot load models until you install it"
 
-# ── Launch scripts ────────────────────────────────────────────
+# ── Launch script ────────────────────────────────────────────
 step "Creating launch script"
 
-cat > "$APP_DIR/launch.sh" << LAUNCHER
+cat > "$APP_DIR/launch.sh" << 'LAUNCHER_EOF'
 #!/usr/bin/env bash
-cd "$APP_DIR"
-source "$APP_DIR/.venv/bin/activate"
-exec python3 "$APP_DIR/main.py" "\$@"
-LAUNCHER
+# ============================================================
+#  FreedomForge AI — Launcher
+# ============================================================
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="$APP_DIR/.venv"
+LOG_DIR="$APP_DIR/crash_reports"
+LOG_FILE="$LOG_DIR/launcher.log"
+
+RED='\033[0;31m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RESET='\033[0m'
+
+err()  { echo -e "  ${RED}❌  $*${RESET}" >&2; }
+warn() { echo -e "  ${YELLOW}⚠️   $*${RESET}" >&2; }
+info() { echo -e "  ${CYAN}$*${RESET}"; }
+
+# 1) Check .venv exists
+if [[ ! -d "$VENV" ]]; then
+    err "Virtual environment not found: $VENV"
+    err "Please run install.sh first:"
+    err "  bash $APP_DIR/install.sh"
+    exit 1
+fi
+
+# 2) Check display (Linux only)
+if [[ "$(uname -s)" == "Linux" ]]; then
+    if [[ -z "${DISPLAY:-}" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+        err "No display detected (\$DISPLAY and \$WAYLAND_DISPLAY are both unset)."
+        err "FreedomForge AI requires a desktop environment to run."
+        err "If you are on SSH, try: ssh -X user@host  or use a VNC/remote desktop."
+        exit 1
+    fi
+fi
+
+# 3) Verify tkinter
+source "$VENV/bin/activate"
+if ! python3 -c "import tkinter" &>/dev/null 2>&1; then
+    err "tkinter is not available in your Python installation."
+    err "Install it with:  sudo apt-get install -y python3-tk"
+    err "Then re-run:      bash $APP_DIR/install.sh"
+    exit 1
+fi
+
+# 4) Prepare log dir and launch
+mkdir -p "$LOG_DIR"
+info "Launching FreedomForge AI... (log: $LOG_FILE)"
+python3 -u "$APP_DIR/main.py" "$@" 2>&1 | tee "$LOG_FILE"
+LAUNCHER_EOF
+
 chmod +x "$APP_DIR/launch.sh"
 ok "launch.sh created"
 
