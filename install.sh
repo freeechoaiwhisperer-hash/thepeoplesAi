@@ -244,7 +244,7 @@ fi
 
 # 2) Check display (Linux only)
 if [[ "$(uname -s)" == "Linux" ]]; then
-    if [[ -z "${DISPLAY:-}" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
         err "No display detected (\$DISPLAY and \$WAYLAND_DISPLAY are both unset)."
         err "FreedomForge AI requires a desktop environment to run."
         err "If you are on SSH, try: ssh -X user@host  or use a VNC/remote desktop."

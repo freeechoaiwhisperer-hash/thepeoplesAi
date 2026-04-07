@@ -66,7 +66,7 @@ fi
 
 # ── tkinter ──────────────────────────────────────────────────
 hdr "tkinter"
-if python3 -c "import tkinter" &>/dev/null 2>&1; then
+if python3 -c "import tkinter" &>/dev/null; then
     TK_VER=$(python3 -c "import tkinter; print(tkinter.TkVersion)" 2>/dev/null || echo "unknown")
     ok "tkinter available (Tk $TK_VER)"
 else
@@ -102,7 +102,7 @@ if [[ -d "$VENV" ]]; then
 
     check_import() {
         local module="$1" label="${2:-$1}"
-        if python3 -c "import $module" &>/dev/null 2>&1; then
+        if python3 -c "import $module" &>/dev/null; then
             ok "$label"
         else
             case "$module" in
@@ -133,7 +133,7 @@ fi
 if [[ "$OS" == "Linux" ]] && command -v dpkg &>/dev/null; then
     hdr "System libraries (Debian/Ubuntu/Mint)"
     for pkg in python3-tk portaudio19-dev build-essential libssl-dev libffi-dev; do
-        if dpkg -s "$pkg" &>/dev/null 2>&1; then
+        if dpkg -s "$pkg" &>/dev/null; then
             ok "$pkg"
         else
             warn "$pkg not installed"
@@ -145,7 +145,8 @@ fi
 hdr "Crash reports"
 CRASH_DIR="$APP_DIR/crash_reports"
 if [[ -d "$CRASH_DIR" ]]; then
-    COUNT=$(find "$CRASH_DIR" -maxdepth 1 -type f | wc -l)
+    mapfile -t CRASH_FILES < <(find "$CRASH_DIR" -maxdepth 1 -type f)
+    COUNT="${#CRASH_FILES[@]}"
     if [[ "$COUNT" -eq 0 ]]; then
         ok "No crash reports found"
     else
