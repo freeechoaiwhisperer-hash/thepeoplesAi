@@ -50,7 +50,7 @@ def capture(exc: Exception, context: str = "",
         "context":   context,
         "error":     type(exc).__name__,
         "message":   str(exc)[:500],
-        "traceback": traceback.format_exc()[:3000],
+        "traceback": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[:3000],
         "system":    _system_info(),
     }
 
