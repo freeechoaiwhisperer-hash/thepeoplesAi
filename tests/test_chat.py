@@ -25,6 +25,19 @@ _mock_ctk.CTkFont = lambda *a, **kw: None
 _mock_ctk.set_appearance_mode = lambda *a: None
 sys.modules['customtkinter'] = _mock_ctk
 
+# Mock tkinter (not available in headless test environments)
+_mock_tkinter = ModuleType('tkinter')
+_mock_tkinter.Menu = type('Menu', (), {
+    '__init__': lambda self, *a, **kw: None,
+    'add_command': lambda self, *a, **kw: None,
+    'tk_popup': lambda self, *a: None,
+})
+_mock_tkinter_filedialog = ModuleType('tkinter.filedialog')
+_mock_tkinter_filedialog.askopenfilename = lambda *a, **kw: None
+_mock_tkinter.filedialog = _mock_tkinter_filedialog
+sys.modules['tkinter'] = _mock_tkinter
+sys.modules['tkinter.filedialog'] = _mock_tkinter_filedialog
+
 # Mock voice modules
 sys.modules.setdefault('modules.voice_listener', ModuleType('modules.voice_listener'))
 sys.modules.setdefault('modules.voice_tts', ModuleType('modules.voice_tts'))
